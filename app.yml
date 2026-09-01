@@ -1,0 +1,37 @@
+install:
+  commands:
+    - ["npm", "ci", "--include=dev"]
+
+build:
+  commands:
+    - ["npm", "run", "build"]
+    # For standalone mode
+    - ["cp", "-r", ".next/static", ".next/standalone/.next"]
+    - ["cp", "-r", "public", ".next/standalone"]
+    # Avoid packaging extra node_modules since standalone includes its own
+    - ["rm", "-rf", "node_modules"]
+
+run:
+  command: ["node", ".next/standalone/server.js"]
+
+profile:
+  label: "AI Cost Command Center"
+  description: >-
+    One place to see Snowflake AI and platform credit consumption, and to set the
+    quotas, budgets and alerts that govern it.
+  icon: public/icon.svg
+
+# Roles allowed to create quotas, budgets and alerts, trigger a cache refresh,
+# and apply user tags. Everyone else gets read-only monitoring plus a copyable
+# SQL preview. The check runs server-side in the API routes, not just in the UI.
+environment_variables:
+  - name: GOVERNANCE_ADMIN_ROLES
+    value: "ACCOUNTADMIN,SYSADMIN"
+  # Where sql/cache_setup.sql created the aggregate cache. Must match the schema
+  # at the top of that file. If it does not, the app finds no cache and falls
+  # back to querying ACCOUNT_USAGE directly — correct, but ~30x slower.
+  - name: COST_CACHE_SCHEMA
+    value: "APPS.AI_COST_VIZ_APP"
+
+# This is the build-only manifest (no top-level `version:` key): the phases above
+# are the build/run config, and snowflake.yml says where the app is deployed.

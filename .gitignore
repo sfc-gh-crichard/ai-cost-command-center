@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Snowflake CLI
+# snowflake.yml is generated per-account by `snow app setup` and contains that
+# account's database, schema, warehouse and external access integration. It is
+# deliberately not committed — see the README for how to generate your own.
+snowflake.yml
+snowflake.log
+
+# Cortex Code local artifacts (plans, session state)
+.snowflake/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
