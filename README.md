@@ -20,6 +20,23 @@ workflow:
 
 Built entirely with **Cortex Code**, and it deploys the same way — see below.
 
+## What it looks like
+
+**Summary** — total and AI spend priced at their correct separate rates, the AI
+share of the platform, the trend, and where it's going by product and by pipeline.
+Note that automated dynamic-table refreshes are named individually, so the biggest
+line item is identifiable rather than an anonymous "background" row.
+
+![Summary tab: KPI cards for total, AI and platform spend, a stacked spend-over-time area chart, an AI-spend-by-product donut, and a ranked list of top AI spend by user and pipeline](docs/screenshots/summary-tab.png)
+
+**Deep dive** — one page per AI product, each broken down by the dimension that
+actually matters for it. For Cortex Agents that's per agent; for AI Functions it's
+per function and model, down to individual queries with their token counts.
+
+![Deep dive tab: product rail on the left with Cortex Agents selected, showing daily spend, spend by user, spend by agent, and a table of the most expensive AI workloads](docs/screenshots/deep-dive-tab.png)
+
+Both tabs are shown in dark mode; the app follows a light/dark toggle in the header.
+
 > **Disclaimer:** This app is provided as a sample resource for your convenience.
 > It is not officially supported by Snowflake and is provided "as is," without
 > warranty or liability. Please review the code and validate it for your use case
