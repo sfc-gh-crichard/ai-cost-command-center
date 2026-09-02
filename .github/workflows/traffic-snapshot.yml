@@ -1,0 +1,115 @@
+name: Traffic snapshot
+
+# GitHub only retains repository traffic data for a rolling 14-day window and
+# then discards it permanently. This workflow snapshots it daily so long-term
+# history is preserved.
+#
+# Data is written to the `traffic-data` branch, NOT to `main`. That keeps the
+# daily commits out of the main history and means this workflow does not need a
+# bypass on the branch ruleset protecting `main`.
+#
+# View the history at:
+#   https://github.com/sfc-gh-crichard/ai-cost-command-center/blob/traffic-data/traffic-history.csv
+
+on:
+  schedule:
+    # 07:00 UTC daily. Runs well inside the 14-day window, so a few missed runs
+    # (or a repo with no activity) will still be backfilled on the next success.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: traffic-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch traffic data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/traffic/views"  > views.json
+          gh api "repos/${GITHUB_REPOSITORY}/traffic/clones" > clones.json
+          echo "Fetched traffic data:"
+          jq -r '"  views:  \(.count) total, \(.uniques) unique"' views.json
+          jq -r '"  clones: \(.count) total, \(.uniques) unique"' clones.json
+
+      - name: Switch to the traffic-data branch
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin traffic-data >/dev/null 2>&1; then
+            git fetch origin traffic-data
+            git checkout -B traffic-data origin/traffic-data
+          else
+            echo "traffic-data branch does not exist yet; creating it"
+            git checkout --orphan traffic-data
+            # Untrack everything from main. Files stay on disk but are not
+            # staged, so only traffic-history.csv gets committed.
+            git rm -r --cached . --quiet
+          fi
+
+      - name: Merge into traffic-history.csv
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv, json, os
+
+          CSV_PATH = "traffic-history.csv"
+          FIELDS = ["date", "views", "unique_visitors", "clones", "unique_cloners"]
+
+          # Existing history, keyed by date. Re-running is safe: same-date rows are
+          # updated in place rather than duplicated, and gaps are backfilled as long
+          # as the missing days are still inside GitHub's 14-day window.
+          rows = {}
+          if os.path.exists(CSV_PATH):
+              with open(CSV_PATH, newline="") as f:
+                  for row in csv.DictReader(f):
+                      rows[row["date"]] = row
+
+          def merge(path, key, count_field, uniques_field):
+              with open(path) as f:
+                  payload = json.load(f)
+              for entry in payload.get(key, []):
+                  date = entry["timestamp"].split("T")[0]
+                  row = rows.setdefault(date, dict.fromkeys(FIELDS, "0"))
+                  row["date"] = date
+                  row[count_field] = str(entry["count"])
+                  row[uniques_field] = str(entry["uniques"])
+
+          merge("views.json", "views", "views", "unique_visitors")
+          merge("clones.json", "clones", "clones", "unique_cloners")
+
+          with open(CSV_PATH, "w", newline="") as f:
+              writer = csv.DictWriter(f, fieldnames=FIELDS)
+              writer.writeheader()
+              for date in sorted(rows):
+                  writer.writerow({k: rows[date].get(k, "0") for k in FIELDS})
+
+          print(f"traffic-history.csv now covers {len(rows)} day(s)")
+          PY
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          rm -f views.json clones.json
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add traffic-history.csv
+          if git diff --cached --quiet; then
+            echo "No traffic changes to record."
+          else
+            git commit -m "Traffic snapshot $(date -u +%Y-%m-%d)"
+            git push origin traffic-data
+            echo "Recorded traffic snapshot."
+          fi
