@@ -171,7 +171,8 @@ rate is wrong wherever they mix — on a real 30-day window that error was 26%.
 Not every AI *feature* bills in AI credits: Snowflake classes the Cortex Analyst
 API and Cortex Fine-tuning as *Platform Credit (legacy)*, so the app prices those
 at the platform rate.
-[Pricing docs](https://docs.snowflake.com/en/user-guide/snowflake-cortex/pricing).
+[Platform Pricing Sheet](https://www.snowflake.com/legal-files/CreditConsumptionTable.pdf)
+[AI Pricing docs](https://docs.snowflake.com/en/user-guide/snowflake-cortex/pricing).
 
 ### How costs are attributed
 
