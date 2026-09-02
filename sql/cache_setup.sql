@@ -535,6 +535,26 @@ BEGIN
 END;
 $$;
 
+/**
+ * Convenience overload so `CALL SP_REFRESH_COST_CACHE()` works with no argument.
+ *
+ * The one-argument form exists so REFRESH_LOG records who or what triggered a
+ * rebuild (the hourly task, or a named user from the app's Refresh button). That
+ * argument has no default, so a bare no-arg call would fail — an easy trip-up
+ * when running the refresh by hand or from a setup script.
+ */
+CREATE OR REPLACE PROCEDURE SP_REFRESH_COST_CACHE()
+RETURNS VARCHAR
+LANGUAGE SQL
+EXECUTE AS OWNER
+AS
+$$
+BEGIN
+  CALL SP_REFRESH_COST_CACHE('MANUAL');
+  RETURN (SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())));
+END;
+$$;
+
 /* ------------------------------------------------------------------
  * Hourly refresh task
  *
