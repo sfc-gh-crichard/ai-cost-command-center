@@ -10,6 +10,27 @@ name: Traffic snapshot
 #
 # View the history at:
 #   https://github.com/sfc-gh-crichard/ai-cost-command-center/blob/traffic-data/traffic-history.csv
+#
+# ---------------------------------------------------------------------------
+# SETUP REQUIRED: this workflow needs a personal access token.
+#
+# The traffic API requires the `administration: read` permission, which GitHub
+# does not allow you to grant to the built-in GITHUB_TOKEN. Without a PAT the
+# API returns 403, so this workflow skips itself with a warning until one is
+# provided.
+#
+# To enable it, create a fine-grained PAT scoped to only this repository with
+# the single permission `Administration: Read-only`:
+#
+#   https://github.com/settings/personal-access-tokens/new
+#
+# Then add it as a repository secret named TRAFFIC_TOKEN:
+#
+#   gh secret set TRAFFIC_TOKEN -R <owner>/<repo>
+#
+# Use a fine-grained token limited to this one repo rather than a classic
+# `repo`-scoped token: it only needs to read traffic counts.
+# ---------------------------------------------------------------------------
 
 on:
   schedule:
@@ -29,14 +50,28 @@ jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
+      - name: Check for the traffic token
+        id: guard
+        env:
+          TRAFFIC_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+        run: |
+          if [ -z "${TRAFFIC_TOKEN:-}" ]; then
+            echo "::warning::TRAFFIC_TOKEN secret is not set, so traffic cannot be read. See the comment block at the top of this workflow for setup steps. Skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out repository
+        if: steps.guard.outputs.ready == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Fetch traffic data
+        if: steps.guard.outputs.ready == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
         run: |
           set -euo pipefail
           gh api "repos/${GITHUB_REPOSITORY}/traffic/views"  > views.json
@@ -46,6 +81,7 @@ jobs:
           jq -r '"  clones: \(.count) total, \(.uniques) unique"' clones.json
 
       - name: Switch to the traffic-data branch
+        if: steps.guard.outputs.ready == 'true'
         run: |
           set -euo pipefail
           if git ls-remote --exit-code --heads origin traffic-data >/dev/null 2>&1; then
@@ -60,6 +96,7 @@ jobs:
           fi
 
       - name: Merge into traffic-history.csv
+        if: steps.guard.outputs.ready == 'true'
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -100,6 +137,7 @@ jobs:
           PY
 
       - name: Commit if changed
+        if: steps.guard.outputs.ready == 'true'
         run: |
           set -euo pipefail
           rm -f views.json clones.json
